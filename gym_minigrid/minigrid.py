@@ -17,7 +17,8 @@ COLORS = {
     'blue'  : np.array([0, 0, 255]),
     'purple': np.array([112, 39, 195]),
     'yellow': np.array([255, 255, 0]),
-    'grey'  : np.array([100, 100, 100])
+    'grey'  : np.array([100, 100, 100]),
+    'forest_green': np.array([34, 139, 34]),
 }
 
 COLOR_NAMES = sorted(list(COLORS.keys()))
@@ -29,7 +30,8 @@ COLOR_TO_IDX = {
     'blue'  : 2,
     'purple': 3,
     'yellow': 4,
-    'grey'  : 5
+    'grey'  : 5,
+    'forest_green': 6
 }
 
 IDX_TO_COLOR = dict(zip(COLOR_TO_IDX.values(), COLOR_TO_IDX.keys()))
@@ -47,6 +49,7 @@ OBJECT_TO_IDX = {
     'goal'          : 8,
     'lava'          : 9,
     'agent'         : 10,
+    'lawn'          : 11,
 }
 
 IDX_TO_OBJECT = dict(zip(OBJECT_TO_IDX.values(), OBJECT_TO_IDX.keys()))
@@ -176,7 +179,6 @@ class Floor(WorldObj):
         # Give the floor a pale color
         color = COLORS[self.color] / 2
         fill_coords(img, point_in_rect(0.031, 1, 0.031, 1), color)
-
 
 class Lava(WorldObj):
     def __init__(self):
@@ -325,6 +327,17 @@ class Box(WorldObj):
         # Replace the box by its contents
         env.grid.set(*pos, self.contains)
         return True
+
+class Lawn(WorldObj):
+    def __init__(self, color='forest_green'):
+        super().__init__('lawn', color)
+
+    def can_overlap(self):
+        return True
+
+    def render(self, img):
+        fill_coords(img, point_in_rect(0, 1, 0, 1), COLORS[self.color])
+
 
 class Grid:
     """
@@ -577,6 +590,85 @@ class Grid:
         return grid, vis_mask
 
     def process_vis(grid, agent_pos):
+        """
+        The agent_pos is in the center of the grid
+        The agent scans from center outwards in each of the four quadrants
+        Marks neighbors to True if current is True
+        """
+
+        assert agent_pos[0] == grid.width // 2
+        assert agent_pos[1] == grid.height // 2
+        
+        mask = np.zeros(shape=(grid.width, grid.height), dtype=np.bool)
+
+        mask[agent_pos[0], agent_pos[1]] = True
+
+        for j in reversed(range(0, grid.height//2+1)):
+            # top left
+            for i in reversed(range(1, grid.width//2+1)):
+                if not mask[i, j]:
+                    continue
+
+                cell = grid.get(i, j)
+                if cell and not cell.see_behind():
+                    continue
+
+                mask[i-1, j] = True
+                if j > 0:
+                    mask[i-1, j-1] = True
+                    mask[i, j-1] = True
+
+            # bottom left
+            for i in range(grid.width//2, grid.width-1):
+                if not mask[i, j]:
+                    continue
+
+                cell = grid.get(i, j)
+                if cell and not cell.see_behind():
+                    continue
+
+                mask[i+1, j] = True
+                if j > 0: 
+                    mask[i+1, j-1] = True
+                    mask[i, j-1] = True
+
+        for j in range(grid.height//2, grid.height):
+            # top right
+            for i in reversed(range(1, grid.width//2+1)):
+                if not mask[i, j]:
+                    continue
+
+                cell = grid.get(i, j)
+                if cell and not cell.see_behind():
+                    continue
+
+                mask[i-1, j] = True
+                if j < grid.height - 1:
+                    mask[i-1, j+1] = True
+                    mask[i, j+1] = True
+
+            # bottom right
+            for i in range(grid.width//2, grid.width-1):
+                if not mask[i, j]:
+                    continue
+
+                cell = grid.get(i, j)
+                if cell and not cell.see_behind():
+                    continue
+
+                mask[i+1, j] = True
+                if j < grid.height - 1:
+                    mask[i+1, j+1] = True
+                    mask[i, j+1] = True 
+
+        for j in range(0, grid.height):
+            for i in range(0, grid.width):
+                if not mask[i, j]:
+                    grid.set(i, j, None)
+
+        return mask
+
+        """
         mask = np.zeros(shape=(grid.width, grid.height), dtype=np.bool)
 
         mask[agent_pos[0], agent_pos[1]] = True
@@ -614,6 +706,8 @@ class Grid:
                     grid.set(i, j, None)
 
         return mask
+        """
+    
 
 class MiniGridEnv(gym.Env):
     """
@@ -1055,6 +1149,10 @@ class MiniGridEnv(gym.Env):
         else:
             assert False, "invalid agent direction"
 
+        # override previous definition
+        # agent always in the center of the box regardless of the direction
+        topX = self.agent_pos[0] - self.agent_view_size // 2
+        topY = self.agent_pos[1] - self.agent_view_size // 2
         botX = topX + self.agent_view_size
         botY = topY + self.agent_view_size
 
@@ -1127,6 +1225,8 @@ class MiniGridEnv(gym.Env):
                 reward = self._reward()
             if fwd_cell != None and fwd_cell.type == 'lava':
                 done = True
+            if fwd_cell != None and fwd_cell.type == "lawn":
+                reward = 0.90 ** self.step_count * 0.6
 
         # Pick up an object
         elif action == self.actions.pickup:
@@ -1162,6 +1262,124 @@ class MiniGridEnv(gym.Env):
 
         return obs, reward, done, {}
 
+    def gen_lidar_points(self, agent_pos, agent_dir):
+        """
+        Input:
+            agent_pos: (x, y)
+            agent_dir: [0, 1, 2, 3] for right, down, left, up
+        Output:
+            xy_w: 2D locations of the lidar points in the world frame
+            semantic_labels: semantic labels of the lidar points
+        """
+        # Facing right
+        if agent_dir == 0:
+            angle = 0 / 180 * np.pi 
+        # Facing down
+        elif agent_dir == 1:
+            angle = 90 / 180 * np.pi 
+        # Facing left
+        elif agent_dir == 2:
+            angle = 180 / 180 * np.pi 
+        # Facing up
+        elif agent_dir == 3:
+            angle = 270 / 180 * np.pi 
+        else:
+            assert False, "Invalid agent direction"
+
+        agent_pose = [*agent_pos, angle]
+
+        # lidar specs
+        lidar_specs = {
+            'min_range': 0.3,                   # minimum range
+            'max_range': 3.0,                   # maximum range
+            'range_res': 0.05,                         # range resolution
+            'fov': 360. / 180. * np.pi,         # field of view
+            'ang_res': 5. / 180. * np.pi,       # angular resolution
+            'num_scans': 72                     # number of horizontal scans
+        }
+
+        noise_std = 0.00                        # standard deviation of the noise in radial direction
+
+        # grid specs
+        grid_min = [-0.5, -0.5]
+        grid_max = [self.grid.height - 0.5, self.grid.width - 0.5] 
+        grid_res = [1.0, 1.0]
+
+        # generate lidar scan in local frame
+        r = np.arange(lidar_specs['min_range'], 
+            lidar_specs['max_range'] + 1e-6, lidar_specs['range_res'])
+        theta = np.arange(-lidar_specs['fov'] / 2, 
+            lidar_specs['fov'] / 2 + 1e-6, lidar_specs['ang_res'])
+        rr, tt = np.meshgrid(r, theta)
+        xx, yy = rr * np.cos(tt), rr * np.sin(tt)
+
+        # transform lidar to global frame
+        xx_w = np.cos(agent_pose[2]) * xx - np.sin(agent_pose[2]) * yy + agent_pose[0]
+        yy_w = np.sin(agent_pose[2]) * xx + np.cos(agent_pose[2]) * yy + agent_pose[1]
+        x_invalid = np.logical_or(xx_w >= grid_max[0], xx_w <= grid_min[0])
+        y_invalid = np.logical_or(yy_w >= grid_max[1], yy_w <= grid_min[1])
+        invalid = np.logical_or(x_invalid, y_invalid)
+
+        # convert out of bounds values to origin
+        xx_w[invalid] = 0
+        yy_w[invalid] = 0
+
+        # discretize to grids
+        x_idx = self.meters2cell(xx_w, grid_min[0], grid_res[0])
+        y_idx = self.meters2cell(yy_w, grid_min[1], grid_res[1])
+
+        # get wall objects that lidar cannot go through
+        grid_with_walls = self.get_walls_grid()
+        is_obs = grid_with_walls[x_idx, y_idx]
+
+        # move free lidar points to maximum range
+        free_idx = np.logical_and(np.logical_not(invalid), np.logical_not(is_obs))
+        rr[free_idx] = lidar_specs['max_range']
+
+        # get final lidar points         
+        detected_obs = np.argmin(rr, axis=1)
+        r = rr[np.arange(rr.shape[0]), detected_obs]
+        x, y = r * np.cos(theta), r * np.sin(theta)
+        x_w = np.cos(agent_pose[2]) * x - np.sin(agent_pose[2]) * y + agent_pose[0]
+        y_w = np.sin(agent_pose[2]) * x + np.cos(agent_pose[2]) * y + agent_pose[1]
+
+        # add semantic labels
+        x_idx = self.meters2cell(x_w, grid_min[0], grid_res[0])
+        y_idx = self.meters2cell(y_w, grid_min[1], grid_res[1])
+
+        # find semantic labels for lidar points
+        semantic_grid = self.get_objs_grid()
+        semantic_labels = semantic_grid[x_idx, y_idx]
+
+        xy_w = np.stack((x_w, y_w))
+
+        return xy_w, semantic_labels
+
+    def meters2cell(self, x, grid_min, res):
+        """
+        Given a batch of points in meter as numpy array, return the cells index
+        Cell center is the integer location
+        Map range is [-0.5, grid_size - 0.5]
+        """
+        return np.floor(x / res + 0.5).astype(int)
+
+    def get_walls_grid(self):
+        """
+        returns a boolean mask of the walls in the grid
+        """
+        grid = self.get_objs_grid()
+        grid[grid != 2] = 0
+        grid[grid == 2] = 1
+        return grid
+
+    def get_objs_grid(self):
+        """
+        returns a grid of semantic object indices
+        """
+        grid = self.grid.encode()[:,:,0]
+        return grid
+
+
     def gen_obs_grid(self):
         """
         Generate the sub-grid observed by the agent.
@@ -1179,14 +1397,14 @@ class MiniGridEnv(gym.Env):
         # Process occluders and visibility
         # Note that this incurs some performance cost
         if not self.see_through_walls:
-            vis_mask = grid.process_vis(agent_pos=(self.agent_view_size // 2 , self.agent_view_size - 1))
+            vis_mask = grid.process_vis(agent_pos=(self.agent_view_size // 2 , self.agent_view_size // 2))
         else:
             vis_mask = np.ones(shape=(grid.width, grid.height), dtype=np.bool)
 
         # Make it so the agent sees what it's carrying
         # We do this by placing the carried object at the agent's position
         # in the agent's partially observable view
-        agent_pos = grid.width // 2, grid.height - 1
+        agent_pos = grid.width // 2, grid.height // 2
         if self.carrying:
             grid.set(*agent_pos, self.carrying)
         else:
@@ -1206,6 +1424,10 @@ class MiniGridEnv(gym.Env):
 
         assert hasattr(self, 'mission'), "environments must define a textual mission string"
 
+        # generate lidar scans
+        lidar_points, semantic_labels = self.gen_lidar_points(self.agent_pos, self.agent_dir)
+        
+
         # Observations are dictionaries containing:
         # - an image (partially observable view of the environment)
         # - the agent's direction/orientation (acting as a compass)
@@ -1213,7 +1435,9 @@ class MiniGridEnv(gym.Env):
         obs = {
             'image': image,
             'direction': self.agent_dir,
-            'mission': self.mission
+            'mission': self.mission,
+            'lidar_points': lidar_points,
+            'semantic_labels': semantic_labels
         }
 
         return obs
@@ -1228,14 +1452,43 @@ class MiniGridEnv(gym.Env):
         # Render the whole grid
         img = grid.render(
             tile_size,
-            agent_pos=(self.agent_view_size // 2, self.agent_view_size - 1),
+            agent_pos=(self.agent_view_size // 2, self.agent_view_size // 2),
             agent_dir=3,
             highlight_mask=vis_mask
         )
 
         return img
 
-    def render(self, mode='human', close=False, highlight=True, tile_size=TILE_PIXELS):
+    def render_lidar(self, img, lidar_points, semantic_labels, tile_size=TILE_PIXELS):
+        """
+        Render lidar points on top of image
+        """
+
+        res = 1 / tile_size 
+        grid_min = -0.5
+        lidar_points_px = self.meters2cell(lidar_points, grid_min, res) + tile_size // 2
+
+        #import pdb; pdb.set_trace()
+        color_list = [255, 0, 0]  # set lidar color to red
+        # lidar color on top of the semantic objects
+        color_list = {
+            1:      np.array([200, 200, 200]),
+            2:      np.array([255, 255, 255]),
+            8:      np.array([200, 200, 200]),
+            9:      np.array([0, 255, 255]),
+            11:     np.array([255, 0, 0])
+        }
+
+
+        for i in range(lidar_points.shape[1]):
+            sem_label = semantic_labels[i]
+            img[lidar_points_px[1,i], lidar_points_px[0,i], :] = color_list[sem_label]
+
+        return img
+
+        
+
+    def render(self, mode='human', close=False, highlight=False, tile_size=TILE_PIXELS):
         """
         Render the whole-grid human view
         """
@@ -1257,7 +1510,7 @@ class MiniGridEnv(gym.Env):
         # of the agent's view area
         f_vec = self.dir_vec
         r_vec = self.right_vec
-        top_left = self.agent_pos + f_vec * (self.agent_view_size-1) - r_vec * (self.agent_view_size // 2)
+        top_left = self.agent_pos + f_vec * (self.agent_view_size // 2) - r_vec * (self.agent_view_size // 2)
 
         # Mask of which cells to highlight
         highlight_mask = np.zeros(shape=(self.width, self.height), dtype=np.bool)
@@ -1287,6 +1540,10 @@ class MiniGridEnv(gym.Env):
             self.agent_dir,
             highlight_mask=highlight_mask if highlight else None
         )
+
+        # Add lidar scans to the grid img
+        lidar_points, semantic_labels = self.gen_lidar_points(self.agent_pos, self.agent_dir)
+        img = self.render_lidar(img, lidar_points, semantic_labels)
 
         if mode == 'human':
             self.window.show_img(img)
