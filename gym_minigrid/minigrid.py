@@ -1292,7 +1292,7 @@ class MiniGridEnv(gym.Env):
         lidar_specs = {
             'min_range': 0.3,                   # minimum range
             'max_range': 3.0,                   # maximum range
-            'range_res': 0.05,                         # range resolution
+            'range_res': 0.05,                  # range resolution
             'fov': 360. / 180. * np.pi,         # field of view
             'ang_res': 5. / 180. * np.pi,       # angular resolution
             'num_scans': 72                     # number of horizontal scans
@@ -1338,7 +1338,8 @@ class MiniGridEnv(gym.Env):
 
         # get final lidar points         
         detected_obs = np.argmin(rr, axis=1)
-        r = rr[np.arange(rr.shape[0]), detected_obs]
+        r = rr[np.arange(rr.shape[0]), detected_obs] 
+        r += np.random.normal(0, noise_std, r.shape)
         x, y = r * np.cos(theta), r * np.sin(theta)
         x_w = np.cos(agent_pose[2]) * x - np.sin(agent_pose[2]) * y + agent_pose[0]
         y_w = np.sin(agent_pose[2]) * x + np.cos(agent_pose[2]) * y + agent_pose[1]
@@ -1544,6 +1545,9 @@ class MiniGridEnv(gym.Env):
         # Add lidar scans to the grid img
         lidar_points, semantic_labels = self.gen_lidar_points(self.agent_pos, self.agent_dir)
         img = self.render_lidar(img, lidar_points, semantic_labels)
+
+        from matplotlib import pyplot as plt
+        plt.savefig('minigrid_env.pdf', transparent=True)
 
         if mode == 'human':
             self.window.show_img(img)
