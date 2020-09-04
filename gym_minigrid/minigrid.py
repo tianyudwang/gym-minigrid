@@ -1223,10 +1223,10 @@ class MiniGridEnv(gym.Env):
             if fwd_cell != None and fwd_cell.type == 'goal':
                 done = True
                 reward = self._reward()
-            if fwd_cell != None and fwd_cell.type == 'lava':
-                done = True
-            if fwd_cell != None and fwd_cell.type == "lawn":
-                reward = 0.90 ** self.step_count * 0.6
+#            if fwd_cell != None and fwd_cell.type == 'lava':
+#                done = True
+#            if fwd_cell != None and fwd_cell.type == "lawn":
+#                reward = 0.90 ** self.step_count * 0.6
 
         # Pick up an object
         elif action == self.actions.pickup:
@@ -1469,7 +1469,6 @@ class MiniGridEnv(gym.Env):
         grid_min = -0.5
         lidar_points_px = self.meters2cell(lidar_points, grid_min, res) + tile_size // 2
 
-        #import pdb; pdb.set_trace()
         color_list = [255, 0, 0]  # set lidar color to red
         # lidar color on top of the semantic objects
         color_list = {
@@ -1546,8 +1545,8 @@ class MiniGridEnv(gym.Env):
         lidar_points, semantic_labels = self.gen_lidar_points(self.agent_pos, self.agent_dir)
         img = self.render_lidar(img, lidar_points, semantic_labels)
 
-        from matplotlib import pyplot as plt
-        plt.savefig('minigrid_env.pdf', transparent=True)
+        #from matplotlib import pyplot as plt
+        #plt.savefig('minigrid_env.pdf', transparent=True)
 
         if mode == 'human':
             self.window.show_img(img)

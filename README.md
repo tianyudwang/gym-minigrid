@@ -1,3 +1,11 @@
+# Modifications to the Minigrid Environment
+1. Change visible box to be centered at robot position with default size 7
+2. Add lidar sensor with radius 3
+3. Add IRL environment with lawn and lava
+
+# To-do
+- [ ] Add script to automatically generate random IRL environments
+ 
 # Minimalistic Gridworld Environment (MiniGrid)
 
 [![Build Status](https://travis-ci.org/maximecb/gym-minigrid.svg?branch=master)](https://travis-ci.org/maximecb/gym-minigrid)
