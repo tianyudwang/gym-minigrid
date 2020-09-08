@@ -1,7 +1,8 @@
 from gym_minigrid.minigrid import *
 from gym_minigrid.register import register
 
-import os
+import sys, os
+import logging
 import glob
 import yaml
 
@@ -28,8 +29,8 @@ class RandomLava(MiniGridEnv):
             return object_dict
 
         except IndexError:
-            print("All grid configs consumed ...")
-            return None
+            logging.warning("All grid configs consumed ...")
+            sys.exit()
 
         
 

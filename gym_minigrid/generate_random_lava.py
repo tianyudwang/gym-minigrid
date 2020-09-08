@@ -13,7 +13,7 @@ dir_to_dis = {
 }
 
 
-def gen_random_grid(grid_size, objects, max_objects=6, max_length=6):
+def gen_random_grid(grid_size, objects, max_objects=10, max_length=6):
     """
     Generate a random grid with the list of objects
     Grid will be padded with walls on its perimeter in gym-minigrid
