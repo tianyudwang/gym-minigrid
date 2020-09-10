@@ -42,6 +42,9 @@ def gen_random_grid(grid_size, objects, max_objects=10, max_length=6):
     return object_dict
 
 def main():
+    
+    if not os.path.exists(args.out_dir):
+        os.makedirs(args.out_dir)
 
     # Parameters
     grid_size = 9
@@ -61,7 +64,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--out_dir',
         type=str,
-        default="./envs/random_grid_configs/",
+        default=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
+            + '/data/grid_configs/',
         help="Directory to save the generated grids")
     args = parser.parse_args()
     main()
