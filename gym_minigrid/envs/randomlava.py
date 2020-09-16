@@ -71,7 +71,8 @@ class RandomLavaS9Env(RandomLava):
     def __init__(self):
         super().__init__(
             size=9, 
-            objects_dir=os.path.dirname(os.path.abspath(__file__)) + '/random_grid_configs/'
+            objects_dir=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+                + '/data/grid_configs/'
         )
 
 register(

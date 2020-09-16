@@ -48,7 +48,7 @@ def main():
 
     # Parameters
     grid_size = 9
-    num_grids = 100
+    num_grids = 1000
     objects = ['Lawn', 'Lava', 'Wall']
 
     for n in range(num_grids):
