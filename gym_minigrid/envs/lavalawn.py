@@ -1,9 +1,9 @@
 from gym_minigrid.minigrid import *
 from gym_minigrid.register import register
 
-class IRLGridEnv(MiniGridEnv):
+class LavaLawnEnv(MiniGridEnv):
     """
-    Environment with one wall and one lava
+    Environment with one wall one lawn and one lava
     """
 
     def __init__(self, size, obstacle_type=Lawn, seed=None):
@@ -48,11 +48,11 @@ class IRLGridEnv(MiniGridEnv):
 
 
 
-class IRLGridS9Env(IRLGridEnv):
+class LavaLawnS9Env(LavaLawnEnv):
     def __init__(self):
         super().__init__(size=9)
 
 register(
-    id='MiniGrid-IRLGridS9-v0',
-    entry_point='gym_minigrid.envs:IRLGridS9Env'
+    id='MiniGrid-LavaLawnS9-v0',
+    entry_point='gym_minigrid.envs:LavaLawnS9Env'
 )

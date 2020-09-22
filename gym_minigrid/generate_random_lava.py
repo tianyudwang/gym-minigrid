@@ -1,4 +1,6 @@
 import sys, os
+from os.path import dirname, abspath
+import logging
 import random
 import argparse
 import yaml
@@ -13,7 +15,7 @@ dir_to_dis = {
 }
 
 
-def gen_random_grid(grid_size, objects, max_objects=10, max_length=6):
+def gen_random_grid(grid_size, objects, max_objects=16, max_length=6):
     """
     Generate a random grid with the list of objects
     Grid will be padded with walls on its perimeter in gym-minigrid
@@ -22,7 +24,8 @@ def gen_random_grid(grid_size, objects, max_objects=10, max_length=6):
 
     object_dict = {obj: [] for obj in objects}
     
-    for i in range(max_objects):
+    num_objects = np.random.randint(max_objects // 2, max_objects)
+    for i in range(num_objects):
         obj = random.choice(objects) 
         obj_dir = np.random.randint(4)
         obj_start = np.random.randint(grid_size, size=2)
@@ -43,29 +46,67 @@ def gen_random_grid(grid_size, objects, max_objects=10, max_length=6):
 
 def main():
     
-    if not os.path.exists(args.out_dir):
-        os.makedirs(args.out_dir)
+    args.out_dir = dirname(dirname(dirname(abspath(__file__)))) + "/data_{}/grid_configs/".format(args.grid_size)
+    if not os.path.exists(os.path.join(args.out_dir, 'train/')):
+        os.makedirs(os.path.join(args.out_dir, 'train/'))
+    if not os.path.exists(os.path.join(args.out_dir, 'valid/')):
+        os.makedirs(os.path.join(args.out_dir, 'valid/'))
+    if not os.path.exists(os.path.join(args.out_dir, 'test/')):
+        os.makedirs(os.path.join(args.out_dir, 'test/'))
 
     # Parameters
-    grid_size = 9
-    num_grids = 1000
+    train_num_grids = 10000
+    valid_num_grids = 1000
+    test_num_grids = 1000
     objects = ['Lawn', 'Lava', 'Wall']
 
-    for n in range(num_grids):
-        object_dict = gen_random_grid(grid_size, objects)
+    logging.basicConfig(level=logging.INFO)
+    logging.info("Start generating training grid configurations ...")
+    for n in range(train_num_grids):
+        object_dict = gen_random_grid(
+            args.grid_size, objects, 
+            max_objects=args.max_objects,
+            max_length=args.max_length
+        )
         if object_dict is not None:
             with open(os.path.join(args.out_dir, 
-                      "grid_{0:04}.yml".format(n)), 'w') as outfile:
+                      "train/grid_{0:04}.yml".format(n)), 'w') as outfile:
                yaml.dump(object_dict, outfile)  
 
+    logging.info("Start generating validation grid configurations ...")
+    for n in range(valid_num_grids):
+        object_dict = gen_random_grid(
+            args.grid_size, objects, 
+            max_objects=args.max_objects,
+            max_length=args.max_length
+        )
+        if object_dict is not None:
+            with open(os.path.join(args.out_dir, 
+                      "valid/grid_{0:04}.yml".format(n)), 'w') as outfile:
+               yaml.dump(object_dict, outfile) 
 
+    logging.info("Start generating testing grid configurations ...")
+    for n in range(test_num_grids):
+        object_dict = gen_random_grid(
+            args.grid_size, objects, 
+            max_objects=args.max_objects,
+            max_length=args.max_length
+        )
+        if object_dict is not None:
+            with open(os.path.join(args.out_dir, 
+                      "test/grid_{0:04}.yml".format(n)), 'w') as outfile:
+               yaml.dump(object_dict, outfile) 
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--out_dir',
-        type=str,
-        default=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
-            + '/data/grid_configs/',
-        help="Directory to save the generated grids")
+        '--grid_size', type=int, default=16,
+        help='Size of the minigrid environment')
+    parser.add_argument(
+        '--max_objects', type=int, default=16,
+        help='Maximum number of objects in each map')
+    parser.add_argument(
+        '--max_length', type=int, default=6,
+        help='Maximum length of each object')
     args = parser.parse_args()
     main()

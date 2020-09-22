@@ -19,5 +19,5 @@ from gym_minigrid.envs.crossing import *
 from gym_minigrid.envs.lavagap import *
 from gym_minigrid.envs.dynamicobstacles import *
 from gym_minigrid.envs.distshift import *
-from gym_minigrid.envs.irlgrid import *
+from gym_minigrid.envs.lavalawn import *
 from gym_minigrid.envs.randomlava import *
