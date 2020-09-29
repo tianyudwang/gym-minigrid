@@ -103,10 +103,10 @@ if __name__ == '__main__':
         '--grid_size', type=int, default=16,
         help='Size of the minigrid environment')
     parser.add_argument(
-        '--max_objects', type=int, default=16,
+        '--max_objects', type=int, default=32,
         help='Maximum number of objects in each map')
     parser.add_argument(
-        '--max_length', type=int, default=6,
+        '--max_length', type=int, default=8,
         help='Maximum length of each object')
     args = parser.parse_args()
     main()
